@@ -8,6 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
+# Icon mapping for different card types
 ICON_MAP = {
     'exam': 'fas fa-clipboard-check',
     'test': 'fas fa-clipboard-check',
@@ -51,6 +52,7 @@ ICON_MAP = {
     'default': 'fas fa-cube'
 }
 
+# Default layouts for each profile type
 DEFAULT_LAYOUTS = {
     'student': [
         {'id': 'my-cursus', 'title': 'My Cursus', 'icon': 'fas fa-graduation-cap', 'color': None, 'visible': True},
@@ -96,10 +98,7 @@ DEFAULT_LAYOUTS = {
 
 @app.route('/admin-chat', methods=['POST'])
 def admin_chat():
-    """
-    Main endpoint for admin chat interactions
-    Handles layout modification commands for different profiles
-    """
+    """Main endpoint for admin chat interactions"""
     try:
         data = request.json
         message = data.get('message', '')
@@ -123,50 +122,57 @@ def admin_chat():
         }), 500
 
 def analyze_admin_prompt(prompt, profile, current_layout):
-    """
-    Analyze the admin's prompt and return appropriate action
-    """
+    """Analyze the admin's prompt and return appropriate action"""
     prompt_lower = prompt.lower()
     current_cards = current_layout.get('cards', [])
     existing_titles = [card['title'].lower() for card in current_cards if card.get('visible', True)]
     
+    # Show current layout
     if any(keyword in prompt_lower for keyword in ['show', 'display', 'list', 'current']) and \
        any(keyword in prompt_lower for keyword in ['layout', 'cards', 'dashboard']):
         return handle_show_layout(current_cards, profile)
     
+    # Delete/remove element
     delete_match = re.search(r'(delete|remove|hide)\s+(?:the\s+)?(.+?)(?:\s+card)?$', prompt_lower)
     if delete_match:
         element_name = delete_match.group(2).strip()
         return handle_delete_element(element_name, existing_titles, profile)
 
+    # Add new element
     add_match = re.search(r'(?:add|create)\s+(?:a\s+)?(?:new\s+)?(.+?)\s*(?:card|element|section)?$', prompt_lower)
     if add_match:
         element_name = add_match.group(1).strip()
         return handle_add_element(element_name, existing_titles, profile)
     
+    # Swap elements
     swap_match = re.search(r'(swap|switch|exchange)\s+(.+?)\s+(?:and|with)\s+(.+)', prompt_lower)
     if swap_match:
         item1, item2 = swap_match.groups()[1:]
         return handle_swap_elements(item1.strip(), item2.strip(), existing_titles, profile)
     
+    # Change color
     color_match = re.search(r'(change|make|set)\s+(.+?)\s+(?:color\s+)?(?:to|as)\s+(red|blue|green|yellow|purple|orange|pink)', prompt_lower)
     if color_match:
         element, color = color_match.groups()[1:]
         return handle_change_color(element.strip(), color.strip(), existing_titles, profile)
     
+    # Move element
     move_match = re.search(r'(move|position)\s+(.+?)\s+(?:to|after|before)\s+(.+)', prompt_lower)
     if move_match:
         element, position = move_match.groups()[1:]
         return handle_move_element(element.strip(), position.strip(), existing_titles, profile)
     
+    # Toggle visibility
     visibility_match = re.search(r'(hide|show|display)\s+(.+)', prompt_lower)
     if visibility_match:
         action, element = visibility_match.groups()
         return handle_toggle_visibility(element.strip(), action.strip() == "show", existing_titles, profile)
     
+    # Reset layout
     if any(keyword in prompt_lower for keyword in ['reset', 'restore', 'default']):
         return handle_reset_layout(profile)
     
+    # Default help message
     return get_help_message(profile)
 
 def handle_show_layout(current_cards, profile):
@@ -372,7 +378,7 @@ def get_help_message(profile):
             "Add new Exams card",
             "Remove Library card", 
             "Change Grades color to blue",
-            "Swap My Cursus and Announcements",
+            "Swap My Cursus an Announcements",
             "Show current layout"
         ],
         'teacher': [
@@ -407,82 +413,9 @@ def get_help_message(profile):
         "profile": profile
     }
 
-@app.route('/get-default-layout', methods=['POST'])
-def get_default_layout():
-    """Get default layout for a specific profile"""
-    try:
-        data = request.json
-        profile = data.get('profile', 'student')
-        
-        if profile not in DEFAULT_LAYOUTS:
-            return jsonify({
-                "error": "Invalid profile",
-                "message": f"Profile '{profile}' not found"
-            }), 400
-        
-        return jsonify({
-            "profile": profile,
-            "layout": DEFAULT_LAYOUTS[profile],
-            "message": f"Default layout for {profile.title()} profile"
-        })
-    
-    except Exception as e:
-        return jsonify({
-            "error": "Server error",
-            "message": str(e)
-        }), 500
-
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "message": "Admin API is running",
-        "timestamp": datetime.now().isoformat(),
-        "available_profiles": list(DEFAULT_LAYOUTS.keys())
-    })
-
-@app.route('/profiles', methods=['GET'])
-def get_profiles():
-    """Get available profiles and their default layouts"""
-    return jsonify({
-        "profiles": {
-            "student": {
-                "name": "Student",
-                "icon": "🎓",
-                "description": "Academic assistance and learning support",
-                "default_cards": len(DEFAULT_LAYOUTS['student'])
-            },
-            "teacher": {
-                "name": "Teacher", 
-                "icon": "👨‍🏫",
-                "description": "Educational tools and curriculum development",
-                "default_cards": len(DEFAULT_LAYOUTS['teacher'])
-            },
-            "ats": {
-                "name": "ATS",
-                "icon": "⚙️", 
-                "description": "Administrative and technical support",
-                "default_cards": len(DEFAULT_LAYOUTS['ats'])
-            },
-            "doctoral": {
-                "name": "Doctoral",
-                "icon": "🔬",
-                "description": "Advanced research assistance",
-                "default_cards": len(DEFAULT_LAYOUTS['doctoral'])
-            }
-        }
-    })
-
 if __name__ == '__main__':
     print("Starting Admin API Server...")
     print("Available endpoints:")
     print("- POST /admin-chat - Main admin chat interface")
-    print("- POST /get-default-layout - Get default layout for profile")
-    print("- GET /health - Health check")
-    print("- GET /profiles - Get available profiles")
     print("\nServer will be available at: http://localhost:5000")
-    print("Make sure to install required packages:")
-    print("pip install flask flask-cors fuzzywuzzy python-levenshtein")
-    
     app.run(host='0.0.0.0', port=5000, debug=True)
